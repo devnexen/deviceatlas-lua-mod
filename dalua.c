@@ -8,6 +8,7 @@
 
 typedef struct {
    da_atlas_t atlas;
+   da_config_t cfg;
    void *atlasptr;
    size_t atlasimgsz;
    time_t jsoncreation;
@@ -54,21 +55,56 @@ static int
 dalua_new(lua_State *L)
 {
     dalua_t *dl;
-
     dl = (dalua_t *)lua_newuserdata(L, sizeof(*dl));
     if (dl == 0)
         return (0);
+
     dl->atlasptr = 0;
     dl->jsonpath = 0;
     dl->atlasimgsz = 0;
     dl->jsonversion = 0;
     dl->jsonrevision = 0;
     dl->jsoncreation = (time_t)0;
+    dl->cfg.ua_props = 1u;
+    dl->cfg.lang_props = 1u;
 
     luaL_getmetatable(L, "DAlua");
     lua_setmetatable(L, -2);
 
     return (1);
+}
+
+static int
+dalua_set_config(lua_State *L)
+{
+    dalua_t *dl;
+    dl = (dalua_t *)luaL_checkudata(L, 1, "DAlua");
+    if (dl == 0) {
+        luaL_error(L, "needs to be instantiated");
+        lua_pushboolean(L, 0);
+        return (0);
+    }
+
+    if (lua_istable(L, 2) == 1) {
+        for (lua_pushnil(L); lua_next(L, 2) != 0; lua_pop(L, 1)) {
+            if (!lua_isstring(L, -2))
+                continue;
+	    if (!lua_isboolean(L, -1) || !lua_isinteger(L, -1))
+                continue;
+	    const char *key = luaL_checkstring(L, -2);
+	    unsigned int value = (luaL_checkinteger(L, -1) != 0);
+	    if (strcasecmp(key, "uaprops") == 0)
+                dl->cfg.ua_props = value;
+	    else if (strcasecmp(key, "lgprops") == 0)
+                dl->cfg.lang_props = value;
+        }
+        lua_pushboolean(L, 1);
+	return (1);
+    }
+
+    luaL_error(L, "only a table is accepted");
+    lua_pushboolean(L, 0);
+    return (0);
 }
 
 static int
@@ -97,6 +133,7 @@ dalua_load_data_from_file(lua_State *L)
         da_property_decl_t extra[1] = {{ 0, 0 }};
         status = da_atlas_open(&dl->atlas, extra, dl->atlasptr, dl->atlasimgsz);
         if (status == DA_OK) {
+            da_atlas_setconfig(&dl->atlas, &dl->cfg);
             dl->jsonpath = jsonpath;
             dl->jsonrevision = da_getdatarevision(&dl->atlas);
             dl->jsoncreation = da_getdatacreation(&dl->atlas);
@@ -125,9 +162,10 @@ dalua_get_properties(lua_State *L)
     const char *propname;
 
     dl = (dalua_t *)luaL_checkudata(L, 1, "DAlua");
-
-    if (dl->atlasptr == 0)
+    if (dl->atlasptr == 0) {
+        luaL_error(L, "data file needs to be loaded");
         return (0);
+    }
 
     if (lua_isstring(L, 2) == 1) {
         const char *value = luaL_checkstring(L, 2);
@@ -295,6 +333,12 @@ dalua_tostring(lua_State *L)
     luaL_addstring(&buf, "\n");
     luaL_addstring(&buf, "\tversion: ");
     luaL_addstring(&buf, dl->jsonversion != 0 ? dl->jsonversion : "/");
+    luaL_addstring(&buf, "\n");
+    luaL_addstring(&buf, "\tuar properties: ");
+    luaL_addstring(&buf, dl->cfg.ua_props != 0 ? "true" : "false");
+    luaL_addstring(&buf, "\n");
+    luaL_addstring(&buf, "\tlang properties: ");
+    luaL_addstring(&buf, dl->cfg.lang_props != 0 ? "true" : "false");
     luaL_addstring(&buf, "\n]\n");
     luaL_pushresult(&buf);
 
@@ -307,6 +351,7 @@ static const struct luaL_Reg dalua_methods[] = {
     { "get_jsonrevision", dalua_get_jsonrevision },
     { "get_jsoncreation", dalua_get_jsoncreation },
     { "get_jsonversion", dalua_get_jsonversion },
+    { "set_config", dalua_set_config },
     { "__tostring", dalua_tostring },
     { "__gc", dalua_free },
     { NULL, NULL },

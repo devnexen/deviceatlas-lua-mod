@@ -3,8 +3,14 @@ if #arg < 2 then
   print "Needs the path of the json file and the user-agent"
   os.exit()
 end
+cfg = {}
+cfg["uaprops"] = true
+cfg["lgprops"] = true
 d = dalua.new()
+set = d:set_config(cfg)
+print(set)
 d:load_data_from_file(arg[1])
+print(d)
 start = os.clock()
 dt = 0
 for i=0, 100000 do
