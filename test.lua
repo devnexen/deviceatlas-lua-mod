@@ -7,7 +7,9 @@ cfg = {}
 cfg["cache_size"] = 10000
 d = dalua.new()
 d:load_data_from_file(arg[1])
+set = d:set_config(cfg)
 print(d)
+print(set)
 start = os.clock()
 dt = 0
 for i=0, 100000 do

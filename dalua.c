@@ -98,16 +98,21 @@ dalua_set_config(lua_State *L)
         for (lua_pushnil(L); lua_next(L, 2) != 0; lua_pop(L, 1)) {
             if (!lua_isstring(L, -2))
                 continue;
-	    if (!lua_isboolean(L, -1) || !lua_isinteger(L, -1))
+#if DATLAS_MAJOR_VERSION == 2
+	    if (!lua_isboolean(L, -1))
+#else
+	    if (!lua_isinteger(L, -1))
+#endif
                 continue;
 	    const char *key = luaL_checkstring(L, -2);
-	    unsigned int value = (luaL_checkinteger(L, -1) != 0);
 #if DATLAS_MAJOR_VERSION == 2
+	    unsigned int value = (luaL_checkinteger(L, -1) != 0);
 	    if (strcasecmp(key, "uaprops") == 0)
                 dl->cfg.ua_props = value;
 	    else if (strcasecmp(key, "lgprops") == 0)
                 dl->cfg.lang_props = value;
 #else
+	    unsigned int value = luaL_checkinteger(L, -1);
 	    if (strcasecmp(key, "cache_size") == 0)
 		dl->cfg.cache_size = value;
 #endif
