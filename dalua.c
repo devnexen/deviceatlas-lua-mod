@@ -12,7 +12,10 @@ typedef struct {
    void *atlasptr;
    size_t atlasimgsz;
    time_t jsoncreation;
+#if DATLAS_MAJOR_VERSION == 2
+   // FIXME: could be dropped in some months
    int jsonrevision;
+#endif
    char *jsonversion;
    const char *jsonpath;
 } dalua_t;
@@ -47,7 +50,9 @@ free_atlas(dalua_t *dl)
     dl->jsonpath = 0;
     dl->atlasimgsz = 0;
     dl->jsonversion = 0;
+#if DATLAS_MAJOR_VERSION == 2
     dl->jsonrevision = 0;
+#endif
     dl->jsoncreation = (time_t)0;
 }
 
@@ -63,10 +68,14 @@ dalua_new(lua_State *L)
     dl->jsonpath = 0;
     dl->atlasimgsz = 0;
     dl->jsonversion = 0;
+#if DATLAS_MAJOR_VERSION == 2
     dl->jsonrevision = 0;
-    dl->jsoncreation = (time_t)0;
     dl->cfg.ua_props = 1u;
     dl->cfg.lang_props = 1u;
+#else
+    dl->cfg.cache_size = 0u;
+#endif
+    dl->jsoncreation = (time_t)0;
 
     luaL_getmetatable(L, "DAlua");
     lua_setmetatable(L, -2);
@@ -93,10 +102,15 @@ dalua_set_config(lua_State *L)
                 continue;
 	    const char *key = luaL_checkstring(L, -2);
 	    unsigned int value = (luaL_checkinteger(L, -1) != 0);
+#if DATLAS_MAJOR_VERSION == 2
 	    if (strcasecmp(key, "uaprops") == 0)
                 dl->cfg.ua_props = value;
 	    else if (strcasecmp(key, "lgprops") == 0)
                 dl->cfg.lang_props = value;
+#else
+	    if (strcasecmp(key, "cache_size") == 0)
+		dl->cfg.cache_size = value;
+#endif
         }
         lua_pushboolean(L, 1);
 	return (1);
@@ -133,9 +147,11 @@ dalua_load_data_from_file(lua_State *L)
         da_property_decl_t extra[1] = {{ 0, 0 }};
         status = da_atlas_open(&dl->atlas, extra, dl->atlasptr, dl->atlasimgsz);
         if (status == DA_OK) {
+#if DATLAS_MAJOR_VERSION == 2
             da_atlas_setconfig(&dl->atlas, &dl->cfg);
-            dl->jsonpath = jsonpath;
             dl->jsonrevision = da_getdatarevision(&dl->atlas);
+#endif
+            dl->jsonpath = jsonpath;
             dl->jsoncreation = da_getdatacreation(&dl->atlas);
             dl->jsonversion = da_getdataversion(&dl->atlas);
             lua_pushboolean(L, 1);
@@ -261,6 +277,7 @@ dalua_get_properties(lua_State *L)
     return (1);
 }
 
+#if DATLAS_MAJOR_VERSION == 2
 static int
 dalua_get_jsonrevision(lua_State *L)
 {
@@ -269,6 +286,7 @@ dalua_get_jsonrevision(lua_State *L)
     lua_pushinteger(L, dl->jsonrevision);
     return (1);
 }
+#endif
 
 static int
 dalua_get_jsoncreation(lua_State *L)
@@ -322,10 +340,12 @@ dalua_tostring(lua_State *L)
     luaL_addstring(&buf, "\tpath: ");
     luaL_addstring(&buf, dl->jsonpath != 0 ? dl->jsonpath : "/");
     luaL_addstring(&buf, "\n");
+#if DATLAS_MAJOR_VERSION == 2
     luaL_addstring(&buf, "\trevision: ");
     snprintf(sbuf, sizeof(sbuf), "%d", dl->jsonrevision);
     luaL_addstring(&buf, sbuf);
     luaL_addstring(&buf, "\n");
+#endif
     memset(sbuf, 0, sizeof(sbuf));
     luaL_addstring(&buf, "\tcreation timestamp: ");
     snprintf(sbuf, sizeof(sbuf), "%ld", dl->jsoncreation);
@@ -334,11 +354,18 @@ dalua_tostring(lua_State *L)
     luaL_addstring(&buf, "\tversion: ");
     luaL_addstring(&buf, dl->jsonversion != 0 ? dl->jsonversion : "/");
     luaL_addstring(&buf, "\n");
+#if DATLAS_MAJOR_VERSION == 2
     luaL_addstring(&buf, "\tuar properties: ");
     luaL_addstring(&buf, dl->cfg.ua_props != 0 ? "true" : "false");
     luaL_addstring(&buf, "\n");
     luaL_addstring(&buf, "\tlang properties: ");
     luaL_addstring(&buf, dl->cfg.lang_props != 0 ? "true" : "false");
+#else
+    memset(sbuf, 0, sizeof(sbuf));
+    luaL_addstring(&buf, "\tcache size: ");
+    snprintf(sbuf, sizeof(sbuf), "%u", dl->cfg.cache_size);
+    luaL_addstring(&buf, sbuf);
+#endif
     luaL_addstring(&buf, "\n]\n");
     luaL_pushresult(&buf);
 
@@ -348,7 +375,9 @@ dalua_tostring(lua_State *L)
 static const struct luaL_Reg dalua_methods[] = {
     { "load_data_from_file", dalua_load_data_from_file },
     { "get_properties", dalua_get_properties },
+#if DATLAS_MAJOR_VERSION == 2
     { "get_jsonrevision", dalua_get_jsonrevision },
+#endif
     { "get_jsoncreation", dalua_get_jsoncreation },
     { "get_jsonversion", dalua_get_jsonversion },
     { "set_config", dalua_set_config },

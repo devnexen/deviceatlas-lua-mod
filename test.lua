@@ -4,11 +4,8 @@ if #arg < 2 then
   os.exit()
 end
 cfg = {}
-cfg["uaprops"] = true
-cfg["lgprops"] = true
+cfg["cache_size"] = 10000
 d = dalua.new()
-set = d:set_config(cfg)
-print(set)
 d:load_data_from_file(arg[1])
 print(d)
 start = os.clock()
